@@ -59,6 +59,7 @@
 //#define BOARD_TYPE 7 // PowerTowerRx
 //#define BOARD_TYPE 8 // openLRSng microRx
 //#define BOARD_TYPE 9 // BroversityRX
+#define BOARD_TYPE 10 // OpenLRSTT Teensy-based TX 
 
 //### Module type selection (default = 433, only needed for modified HW)
 //#define RFMTYPE 868

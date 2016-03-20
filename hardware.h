@@ -1424,3 +1424,72 @@ void setupRfmInterrupt()
 }
 
 #endif
+
+#if (BOARD_TYPE == 10) // OpenLRSTT transmitter using Teensy LC
+
+#if (COMPILE_TX != 1)
+#error TX module cannot be used as RX
+#endif
+
+#define TelemetrySerial Serial
+
+#define USE_PULSEPOSITION // use the Teensy PulsePosition library
+#define PPM_IN 6
+
+#define BUZZER_PAS 4
+#define BTN 22
+#define Red_LED 21
+#define Green_LED 20
+
+//## Pins for RFM23BP
+#define IRQ_pin 2
+#define nSel_pin 4
+
+void buzzerInit()
+{
+  pinMode(BUZZER_PAS, OUTPUT);
+  digitalWrite(BUZZER_PAS, LOW);
+}
+
+void buzzerOn(uint16_t freq)
+{
+  if (freq) {
+    analogWriteFrequency(BUZZER_PAS, freq);
+    analogWrite(BUZZER_PAS, 127);
+  } else {
+    analogWrite(BUZZER_PAS, 0);
+  }
+}
+
+#define buzzerOff(foo) buzzerOn(0)
+
+#define Red_LED_ON  digitalWrite(Red_LED, HIGH);
+#define Red_LED_OFF digitalWrite(Red_LED, LOW);
+
+#define Green_LED_ON   digitalWrite(Green_LED, HIGH);
+#define Green_LED_OFF  digitalWrite(Green_LED, LOW);
+
+#define  nIRQ_1 (digitalRead(IRQ_pin) == HIGH)
+#define  nIRQ_0 (digitalRead(IRQ_pin) == LOW)
+
+#define  nSEL_on digitalWrite(nSel_pin, HIGH)
+#define  nSEL_off digitalWrite(nSel_pin, LOW)
+
+void setupSPI()
+{
+  pinMode(IRQ_pin, INPUT);
+  pinMode(nSel_pin, OUTPUT);
+  digitalWrite(nSel_pin, OUTPUT);
+  SPI.begin();
+}
+
+#define IRQ_interrupt 0
+// Set up interrupt: call RFM22B_Int whenever IRQ_pin falls low
+void setupRfmInterrupt()
+{
+  attachInterrupt(IRQ_pin, RFM22B_Int, FALLING);
+}
+
+#define SWAP_GPIOS
+
+#endif
