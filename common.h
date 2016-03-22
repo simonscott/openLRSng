@@ -282,6 +282,27 @@ void scannerMode(void)
 
 uint8_t ItStatus1, ItStatus2;
 
+#ifdef TEENSY
+uint8_t spiReadRegister(uint8_t address)
+{
+  uint8_t result;
+
+  nSEL_off;
+  SPI.transfer(address & 0x7F);
+  result = SPI.transfer(0);
+  nSEL_on;
+  return(result);
+}
+
+void spiWriteRegister(uint8_t address, uint8_t data)
+{
+  nSEL_off;
+  SPI.transfer(address | 0x80);
+  SPI.transfer(data);
+  nSEL_on;
+}
+
+#else
 void spiWriteBit(uint8_t b);
 
 void spiSendCommand(uint8_t command);
@@ -385,6 +406,7 @@ void spiWriteRegister(uint8_t address, uint8_t data)
   spiWriteData(data);
   nSEL_on;
 }
+#endif
 
 // **** RFM22 access functions
 

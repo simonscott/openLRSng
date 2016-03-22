@@ -1435,16 +1435,16 @@ void setupRfmInterrupt()
 #define TelemetrySerial Serial1   // Pins not connected (reserved for future use)
 
 #define USE_FTM0 // use the Teensy FlexTimer FTM0 module
-#define PPM_IN 6
 
+// Define I/O pins
+#define PPM_IN 6
 #define BUZZER_PAS 4
 #define BTN 22
 #define Red_LED 21
 #define Green_LED 20
-
-//## Pins for RFM23BP
 #define IRQ_pin 2
 #define nSel_pin 4
+#define SDI_pin 11
 
 void buzzerInit()
 {
@@ -1476,12 +1476,17 @@ void buzzerOn(uint16_t freq)
 #define  nSEL_on digitalWrite(nSel_pin, HIGH)
 #define  nSEL_off digitalWrite(nSel_pin, LOW)
 
+#define  SDI_on digitalWrite(SDI_pin, HIGH)
+#define  SDI_off digitalWrite(SDI_pin, LOW)
+
+#include <SPI.h>
 void setupSPI()
 {
   pinMode(IRQ_pin, INPUT);
   pinMode(nSel_pin, OUTPUT);
-  digitalWrite(nSel_pin, OUTPUT);
+  nSEL_on;
   SPI.begin();
+  SPI.beginTransaction(SPISettings(5000000, MSBFIRST, SPI_MODE0));
 }
 
 #define IRQ_interrupt 0
