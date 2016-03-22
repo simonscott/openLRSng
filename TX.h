@@ -125,6 +125,119 @@ void setupPPMinput()
   TIMSK1 |= (1 << ICIE1);   // Enable timer1 input capture interrupt
 }
 
+#elif defined USE_FTM0 // Use FlexTimer FTM0 on Teensy
+
+// Conversion: clocks to us
+#if defined(KINETISK)
+#define CLOCKS_PER_MICROSECOND ((double)F_BUS / 1000000.0)
+#elif defined(KINETISL)
+#define CLOCKS_PER_MICROSECOND ((double)F_PLL / 2000000.0)
+#endif
+
+// FTM_SC_TOIE: enable FTM overflow interrupts
+// FTM_SC_CLKS(1): sets counter to increment on every clock cycle
+// FTM_SC_PS(0): no prescaler
+#define FTM0_SC_VALUE (FTM_SC_TOIE | FTM_SC_CLKS(1) | FTM_SC_PS(0))
+
+struct ftm_channel_struct {
+	uint32_t csc;
+	uint32_t cv;
+};
+
+// Static global variables
+uint32_t ftmChannel;
+uint8_t cscEdge;
+volatile uint32_t startPulse = 0;
+volatile uint16_t overflowCount = 0;
+struct ftm_channel_struct* ftm;
+
+void ftm0_isr(void)
+{
+  uint32_t stopPulse, m_overflowCount, durationClks;
+  bool overflowThisInt = false;
+
+  // If timer overflow occurred, record the overflow and reset it.
+	if (FTM0_SC & 0x80)
+  {
+    #if defined(KINETISK)
+		FTM0_SC = FTM0_SC_VALUE;
+		#elif defined(KINETISL)
+		FTM0_SC = FTM0_SC_VALUE | FTM_SC_TOF;
+    #endif
+		overflowCount++;
+		overflowThisInt = true;
+	}
+
+  // If a rising/falling event occurred on the PPMIn pin
+  if(FTM0_STATUS & (1 << ftmChannel))
+  {
+    // Get current timer value and ACK interrupt
+    stopPulse = ftm->cv;
+    ftm->csc = cscEdge;
+
+	  if (timerVal > 0xE000 && overflowThisInt)
+      m_overflowCount = overflowCount - 1;
+    else
+      m_overflowCount = overflowCount;
+
+    // Add the number of overflow events to the current timer value
+    stopPulse |= (m_overflowCount << 16);
+
+    // Calculate pulse duration in clocks. Wraparound is ok, as numbers are unsigned.
+    durationClks = stopPulse - startPulse;
+    startPulse = stopPulse;
+
+    // Process the interval between pulses
+    processPulse(uint16_t(durationClks / CLOCKS_PER_MICROSECOND));
+  }
+}
+
+
+// Configure the FTM module to measure pulse duration
+void setupPPMinput()
+{
+  volatile void *reg;
+
+  // Determine if we are capturing falling or rising edge
+  if (!(tx_config.flags & INVERTED_PPMIN)) {
+    cscEdge = 0b01001000;
+  else
+    cscEdge = 0b01000100;
+  }
+
+  // Setup up the FTM0 registers, if they are not already correctly configured
+  if (FTM0_MOD != 0xFFFF || (FTM0_SC & 0x7F) != FTM0_SC_VALUE) {
+    FTM0_SC = 0;
+    FTM0_CNT = 0;
+    FTM0_MOD = 0xFFFF;
+    FTM0_SC = FTM0_SC_VALUE;
+    #if defined(KINETISK)
+		FTM0_MODE = 0;
+		#endif
+  }
+
+  // Determine which FTM channel to use based on PPMIn pin
+  switch (PPMIn) {
+    case  6: ftmChannel = 4; reg = &FTM0_C4SC; break;
+    case  9: ftmChannel = 2; reg = &FTM0_C2SC; break;
+    case 10: ftmChannel = 3; reg = &FTM0_C3SC; break;
+    case 20: ftmChannel = 5; reg = &FTM0_C5SC; break;
+    case 22: ftmChannel = 0; reg = &FTM0_C0SC; break;
+    case 23: ftmChannel = 1; reg = &FTM0_C1SC; break;
+  default:
+    return false;
+
+  // Configure the Status and Control Register (CnSC) for the appropriate input pin
+  ftm = (struct ftm_channel_struct *)reg;
+  *portConfigRegister(PPMIn) = PORT_PCR_MUX(4);
+  ftm->csc = cscEdge;
+
+  // Enable the interrupt
+  NVIC_SET_PRIORITY(IRQ_FTM0, 32);
+  NVIC_ENABLE_IRQ(IRQ_FTM0);
+
+}
+
 #else // sample PPM using pinchange interrupt
 ISR(PPM_Signal_Interrupt)
 {
@@ -383,11 +496,18 @@ void setup(void)
   pinMode(TX_MODE2, INPUT);
   digitalWrite(TX_MODE2, HIGH);
 #endif
+#ifdef TEENSY
+  pinMode(PPM_IN, INPUT_PULLUP);
+#else
   pinMode(PPM_IN, INPUT); //PPM from TX
   digitalWrite(PPM_IN, HIGH); // enable pullup for TX:s with open collector output
+#endif
 #if defined (RF_OUT_INDICATOR)
   pinMode(RF_OUT_INDICATOR, OUTPUT);
   digitalWrite(RF_OUT_INDICATOR, LOW);
+#endif
+#ifdef TEENSY
+  pinMode(BTN, INPUT_PULLUP);
 #endif
   buzzerInit();
 

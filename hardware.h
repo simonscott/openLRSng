@@ -1431,9 +1431,10 @@ void setupRfmInterrupt()
 #error TX module cannot be used as RX
 #endif
 
-#define TelemetrySerial Serial
+#define TEENSY
+#define TelemetrySerial Serial1   // Pins not connected (reserved for future use)
 
-#define USE_PULSEPOSITION // use the Teensy PulsePosition library
+#define USE_FTM0 // use the Teensy FlexTimer FTM0 module
 #define PPM_IN 6
 
 #define BUZZER_PAS 4
