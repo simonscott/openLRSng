@@ -302,6 +302,19 @@ void spiWriteRegister(uint8_t address, uint8_t data)
   nSEL_on;
 }
 
+// Implemented for binary_com.h
+void spiSendAddress(uint8_t i)
+{
+  nSEL_off;
+  SPI.transfer(address & 0x7F);
+}
+
+// Implemented for binary_com.h
+uint8_t spiReadData(void)
+{
+  return SPI.transfer(0);
+}
+
 #else
 void spiWriteBit(uint8_t b);
 

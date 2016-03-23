@@ -80,6 +80,8 @@ static inline void processPulse(uint16_t pulse)
   if (tx_config.flags & MICROPPM) {
     pulse<<= 1; //  multiply microppm value by 2
   }
+#elif defined TEENSY
+  // Do nothing
 #else
 #error F_CPU invalid
 #endif

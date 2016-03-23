@@ -161,6 +161,28 @@ struct rfm22_modem_regs bind_params =
 // prototype
 void fatalBlink(uint8_t blinks);
 
+#ifdef TEENSY
+#include <EEPROM.h>
+
+// Emulate the AVR function for reading EEPROM
+uint8_t eeprom_read_byte(uint8_t* addr)
+{
+  return EEPROM.read((uint16_t)addr);
+}
+
+// Save EEPROM by writing just changed data
+void myEEPROMwrite(int16_t addr, uint8_t data)
+{
+  uint8_t retries = 5;
+  while ((--retries) && (data != eeprom_read_byte((uint8_t *)addr))) {
+    EEPROM.write(addr, data);
+  }
+  if (!retries) {
+    fatalBlink(2);
+  }
+}
+
+#else
 #include <avr/eeprom.h>
 
 // Save EEPROM by writing just changed data
@@ -174,6 +196,7 @@ void myEEPROMwrite(int16_t addr, uint8_t data)
     fatalBlink(2);
   }
 }
+#endif
 
 static uint16_t CRC16_value;
 
@@ -199,15 +222,31 @@ void CRC16_add(uint8_t c) // CCITT polynome
 extern uint16_t failsafePPM[PPM_CHANNELS];
 #endif
 
+// Teensy LC has less EEPROM, and so can only handle 2 profiles
+#ifdef TEENSY
+
+#define EEPROM_SIZE 128   // EEPROM is 128 bytes on Teensy-LC, 2048 bytes on Teensy 3
+#define MAX_PROFILES  2
+#define ROUNDUP(x) (((x)+15)&0xfff0)
+#if (COMPILE_TX == 1)
+#define EEPROM_DATASIZE ROUNDUP((sizeof(tx_config) + sizeof(bind_data) + 4) * MAX_PROFILES + 3)
+#else
+#define EEPROM_DATASIZE ROUNDUP(sizeof(rx_config) + sizeof(bind_data) + sizeof(failsafePPM) + 6)
+#endif
+
+#else
+
 #define EEPROM_SIZE 1024 // EEPROM is 1k on 328p and 32u4
+#define MAX_PROFILES  4
 #define ROUNDUP(x) (((x)+15)&0xfff0)
 #define MIN256(x)  (((x)<256)?256:(x))
 #if (COMPILE_TX == 1)
-#define EEPROM_DATASIZE MIN256(ROUNDUP((sizeof(tx_config) + sizeof(bind_data) + 4) * 4 + 3))
+#define EEPROM_DATASIZE MIN256(ROUNDUP((sizeof(tx_config) + sizeof(bind_data) + 4) * MAX_PROFILES + 3))
 #else
 #define EEPROM_DATASIZE MIN256(ROUNDUP(sizeof(rx_config) + sizeof(bind_data) + sizeof(failsafePPM) + 6))
 #endif
 
+#endif
 
 bool accessEEPROM(uint8_t dataType, bool write)
 {
@@ -233,7 +272,7 @@ start:
     } else if (dataType == 2) {
       dataAddress = &defaultProfile;
       dataSize = 1;
-      addressNeedle = (sizeof(tx_config) + sizeof(bind_data) + 4) * 4; // defaultProfile is stored behind all 4 profiles
+      addressNeedle = (sizeof(tx_config) + sizeof(bind_data) + 4) * MAX_PROFILES; // defaultProfile is stored behind all 4 profiles
     }
 #else
     if (dataType == 0) {
@@ -316,7 +355,12 @@ void bindInitDefaults(void)
 }
 
 #if (COMPILE_TX == 1)
+
+#ifdef TEENSY
+#define TX_PROFILE_COUNT  2
+#else
 #define TX_PROFILE_COUNT  4
+#endif
 
 void profileSet()
 {
