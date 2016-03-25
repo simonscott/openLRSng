@@ -1,234 +1,160 @@
-##################################################################
-#
-# Makefile for OpenLRSng
-#
+#************************************************************************
+# Original makefile written by apmorton
+# Original taken from https://github.com/apmorton/teensy-template
+# Makefile modified by Simon Scott to work with OpenLRSTT
+#************************************************************************
 
-#
-# If your Arduino is in a weird place, you'll need to change this.
-#
-ARDUINO_PATH=/usr/share/arduino
+# Location of your Arduino installation (post Teensy-patching)
+ARDUINOPATH ?= /home/simon/Programs/teensy/teensyduino_1.27
 
-#
-# Board type can be one of 6 values:
-# 0 - Flytron M1 TX
-# 1 - Flytron M1 RX
-# 2 - Flytron M2, M3 TX, Orange-TX
-# 3 - Flytron V2 RX, Hawkeye RX, HK Orange-RX
-# 4 - Hawkeye TX, OpenLRSng TX
-# 5 - DTF 4ch RX
-# 6 - Deluxe TX
-# 7 - PowerTowerRX
-#
-BOARD_TYPE=3
-BOARD_TYPES_TX=0 2 3 4 5 6 7 8 9
-BOARD_TYPES_RX=2 3 5 7 8 9
+# The name of your project (used to name the compiled .hex file)
+TARGET = $(notdir $(CURDIR))
 
-#
-# You can compile all TX as TX, and all RX as either RX or TX.
-# You cannot currently compile TX as RX.
-# This flag controls what primary function the board will have
-#
-COMPILE_TX=1
+# The teensy version to use, 30, 31, or LC
+TEENSY = LC
 
-#
-# No real user options below here.
-##################################################################
+# Set to 24000000, 48000000, or 96000000 to set CPU core speed
+TEENSY_CORE_SPEED = 48000000
 
-#
-# You don't want to change this unless you really know that you
-# need to.  CPU clock.
-#
-CLOCK=16000000L
+# Some libraries will require this to be defined
+# If you define this, you will break the default main.cpp
+#ARDUINO = 10600
 
-#
-# Board type 6 requires a different Arduino target
-#
-ifeq ($(BOARD_TYPE),6)
-CPU=atmega32u4
-USB_VID=0x2341
-USB_PID=0x8036
-VARIANT=leonardo
-BOOTLOADER=Caterina-Leonardo.hex
+# configurable options
+OPTIONS = -DUSB_SERIAL -DLAYOUT_US_ENGLISH
+
+# directory to build in
+BUILDDIR = $(abspath $(CURDIR)/build)
+
+#************************************************************************
+# Location of Teensyduino utilities, Toolchain, and Arduino Libraries.
+# To use this makefile without Arduino, copy the resources from these
+# locations and edit the pathnames.  The rest of Arduino is not needed.
+#************************************************************************
+
+# path location for Teensy Loader, teensy_post_compile and teensy_reboot
+TOOLSPATH = $(abspath $(ARDUINOPATH)/hardware/tools)
+
+# path location for Teensy 3 core
+COREPATH = $(ARDUINOPATH)/hardware/teensy/avr/cores/teensy3
+
+# path location for Arduino libraries
+LIBRARYPATH = $(ARDUINOPATH)/hardware/teensy/avr/libraries/SPI
+
+# path location for the arm-none-eabi compiler
+COMPILERPATH = $(TOOLSPATH)/arm/bin
+
+#************************************************************************
+# Settings below this point usually do not need to be edited
+#************************************************************************
+
+# CPPFLAGS = compiler options for C and C++
+CPPFLAGS = -Wall -g -Os -mthumb -ffunction-sections -fdata-sections -nostdlib -MMD $(OPTIONS) -DTEENSYDUINO=124 -DF_CPU=$(TEENSY_CORE_SPEED) -I. -I$(COREPATH)
+
+# compiler options for C++ only
+CXXFLAGS = -std=gnu++0x -felide-constructors -fno-exceptions -fno-rtti
+
+# compiler options for C only
+CFLAGS =
+
+# linker options
+LDFLAGS = -Os -Wl,--gc-sections -mthumb
+
+# additional libraries to link
+LIBS = -lm
+
+# compiler options specific to teensy version
+ifeq ($(TEENSY), 30)
+    CPPFLAGS += -D__MK20DX128__ -mcpu=cortex-m4
+    LDSCRIPT = $(COREPATH)/mk20dx128.ld
+    LDFLAGS += -mcpu=cortex-m4 -T$(LDSCRIPT)
 else
-CPU=atmega328p
-USB_VID=null
-USB_PID=null
-VARIANT=standard
-BOOTLOADER=optiboot_atmega328.hex
+    ifeq ($(TEENSY), 31)
+        CPPFLAGS += -D__MK20DX256__ -mcpu=cortex-m4
+        LDSCRIPT = $(COREPATH)/mk20dx256.ld
+        LDFLAGS += -mcpu=cortex-m4 -T$(LDSCRIPT)
+    else
+        ifeq ($(TEENSY), LC)
+            CPPFLAGS += -D__MKL26Z64__ -mcpu=cortex-m0plus
+            LDSCRIPT = $(COREPATH)/mkl26z64.ld
+            LDFLAGS += -mcpu=cortex-m0plus -T$(LDSCRIPT)
+            LIBS += -larm_cortexM0l_math
+        else
+            $(error Invalid setting for TEENSY)
+        endif
+    endif
 endif
 
-#
-# C preprocessor defines
-#
-DEFINES=-DBOARD_TYPE=$(BOARD_TYPE) -DCOMPILE_TX=$(COMPILE_TX) -DRFMTYPE=$(RFMTYPE)
-
-#
-# AVR GCC info
-#
-EXEPREFIX=avr-
-ifneq (,$(wildcard $(ARDUINO_PATH)/hardware/tools/avr/bin/avr-gcc))
-	EXEPATH=$(ARDUINO_PATH)/hardware/tools/avr/bin
-else ifneq (,$(wildcard /usr/bin/avr-gcc))
-	EXEPATH=/usr/bin
+# set arduino define if given
+ifdef ARDUINO
+	CPPFLAGS += -DARDUINO=$(ARDUINO)
+else
+	CPPFLAGS += -DUSING_MAKEFILE
 endif
 
-#
-# AVR gcc and binutils
-#
-CC=$(EXEPATH)/$(EXEPREFIX)gcc
-CXX=$(EXEPATH)/$(EXEPREFIX)g++
-AR=$(EXEPATH)/$(EXEPREFIX)ar
-SIZE=$(EXEPATH)/$(EXEPREFIX)size
-OBJCOPY=$(EXEPATH)/$(EXEPREFIX)objcopy
+# names for the compiler programs
+CC = $(abspath $(COMPILERPATH))/arm-none-eabi-gcc
+CXX = $(abspath $(COMPILERPATH))/arm-none-eabi-g++
+OBJCOPY = $(abspath $(COMPILERPATH))/arm-none-eabi-objcopy
+SIZE = $(abspath $(COMPILERPATH))/arm-none-eabi-size
 
-#
-# Shell commands
-#
-RM=rm
-MKDIR=mkdir
-LS=ls
-SED=sed
-CAT=cat
+# automatically create lists of the sources and objects
+LC_FILES := $(wildcard $(LIBRARYPATH)/*.c)
+LCPP_FILES := $(wildcard $(LIBRARYPATH)/*.cpp)
+TC_FILES := $(wildcard $(COREPATH)/*.c)
+TCPP_FILES := $(filter-out $(COREPATH)/main.cpp, $(wildcard $(COREPATH)/*.cpp))
+C_FILES := $(wildcard *.c)
+CPP_FILES := $(wildcard *.cpp)
+INO_FILES := $(wildcard *.ino)
 
-#
-# Styling
-#
-ASTYLE=astyle
-ASTYLEOPTIONS=--options=none --style=1tbs --indent=spaces=2 --suffix=none --lineend=linux
+# include paths for libraries
+L_INC := $(foreach lib,$(filter %/, $(wildcard $(LIBRARYPATH)/)), -I$(lib))
 
-#
-# Compile flags
-#
-COPTFLAGS= -g -Os -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums \
-	   -fno-inline-small-functions -Wl,--relax -mcall-prologues
+SOURCES := $(C_FILES:.c=.o) $(CPP_FILES:.cpp=.o) $(INO_FILES:.ino=.o) $(TC_FILES:.c=.o) $(TCPP_FILES:.cpp=.o) $(LC_FILES:.c=.o) $(LCPP_FILES:.cpp=.o)
+OBJS := $(foreach src,$(SOURCES), $(BUILDDIR)/$(src))
 
-CFLAGS=-Wall -ffunction-sections -fdata-sections -mmcu=$(CPU) -DF_CPU=$(CLOCK) -MMD \
-	-DUSB_VID=$(USB_VID) -DUSB_PID=$(USB_PID) -DARDUINO=105 -D__PROG_TYPES_COMPAT__ $(DEFINES)
-CXXFLAGS=-fno-exceptions
+all: hex
 
-#
-# Arduino libraries used, compilation settings.
-#
-ARDUINO_LIBS=
-ARDUINO_LIB_PATH=$(ARDUINO_PATH)/libraries/
-ARDUINO_LIB_DIRS=$(addprefix $(ARDUINO_LIB_PATH),$(ARDUINO_LIBS))
-ARDUINO_LIB_INCL=$(addsuffix $(ARDUINO_LIBS),-I$(ARDUINO_LIB_PATH))
-ARDUINO_LIB_SRCS=$(addsuffix .cpp,$(addprefix $(ARDUINO_LIB_PATH),$(ARDUINO_LIBS)/$(ARDUINO_LIBS)))
-ARDUINO_LIB_OBJS=$(patsubst %.cpp, libraries/%.o, $(addsuffix .cpp,$(ARDUINO_LIBS)))
+build: $(TARGET).elf
 
-#
-# Arduino variant settings
-#
-ARDUINO_VARIANT_PATH=$(ARDUINO_PATH)/hardware/arduino/variants/$(VARIANT)
+hex: $(TARGET).hex
 
-#
-# Arduino library files used, compilation settings.
-#
-ARDUINO_CORELIB_PATH=$(ARDUINO_PATH)/hardware/arduino/cores/arduino/
-ARDUINO_CORELIB_SRCS=WInterrupts.c wiring.c wiring_shift.c wiring_digital.c \
-		     wiring_pulse.c wiring_analog.c \
-		     CDC.cpp Print.cpp HardwareSerial.cpp WString.cpp \
-		     Stream.cpp main.cpp USBCore.cpp HID.cpp
-ARDUINO_CORELIB_OBJS= $(patsubst %.c, libraries/%.o, $(patsubst %.cpp, libraries/%.o, $(ARDUINO_CORELIB_SRCS)))
+post_compile: $(TARGET).hex
+	@$(abspath $(TOOLSPATH))/teensy_post_compile -file="$(basename $<)" -path=$(CURDIR) -tools="$(abspath $(TOOLSPATH))"
 
+reboot:
+	@-$(abspath $(TOOLSPATH))/teensy_reboot
 
-#
-# Arduino stdc library files used, compilation settings.
-#
-ARDUINO_LIBC_PATH=$(ARDUINO_PATH)/hardware/arduino/cores/arduino/avr-libc/
-ARDUINO_LIBC_SRCS=malloc.c realloc.c
+upload: post_compile reboot
 
-#
-# Master include path
-#
-INCLUDE=-I$(ARDUINO_CORELIB_PATH) -I$(ARDUINO_VARIANT_PATH) $(ARDUINO_LIB_INCL) -I.
+$(BUILDDIR)/%.o: %.c
+	@echo "[CC]\t$<"
+	@mkdir -p "$(dir $@)"
+	@$(CC) $(CPPFLAGS) $(CFLAGS) $(L_INC) -o "$@" -c "$<"
 
-#
-# Project folders
-#
-LIBRARIES_FOLDER=libraries
-OUT_FOLDER=out
+$(BUILDDIR)/%.o: %.cpp
+	@echo "[CXX]\t$<"
+	@mkdir -p "$(dir $@)"
+	@$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(L_INC) -o "$@" -c "$<"
 
-#
-# Target object files
-#
-OBJS=openLRSng.o $(ARDUINO_LIB_OBJS) $(LIBRARIES_FOLDER)/libcore.a
+$(BUILDDIR)/%.o: %.ino
+	@echo "[CXX]\t$<"
+	@mkdir -p "$(dir $@)"
+	@$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(L_INC) -o "$@" -x c++ -include Arduino.h -c "$<"
 
-#
-# Master target
-#
-all: mkdirs openLRSng.hex
+$(TARGET).elf: $(OBJS) $(LDSCRIPT)
+	@echo "[LD]\t$@"
+	@$(CC) $(LDFLAGS) -o "$@" $(OBJS) $(LIBS)
 
-#
-# From here down are build rules
-#
-VPATH := $(ARDUINO_LIB_DIRS) $(ARDUINO_CORELIB_PATH) $(ARDUINO_LIBC_PATH)
+%.hex: %.elf
+	@echo "[HEX]\t$@"
+	@$(SIZE) "$<"
+	@$(OBJCOPY) -O ihex -R .eeprom "$<" "$@"
 
-define ino-command
-	@$(CXX) -c $(COPTFLAGS) $(CXXFLAGS) $(CFLAGS) $(INCLUDE) -o $@ -x c++ $<
-endef
-define cc-command
-	@$(CC) -c $(COPTFLAGS) $(CFLAGS) $(INCLUDE) -o $@ $<
-endef
-define cxx-command
-	@$(CXX) -c $(COPTFLAGS) $(CXXFLAGS) $(CFLAGS) $(INCLUDE) -o $@ $<
-endef
+# compiler generated dependency info
+-include $(OBJS:.o=.d)
 
-.PHONY: all clean upload astyle 433 868 915 allfw
-
-%.o: %.ino
-	$(ino-command)
-
-%.o: %.c
-	$(cc-command)
-
-%.o: %.cpp
-	$(cxx-command)
-
-$(LIBRARIES_FOLDER)/%.o: %.c
-	$(cc-command) 2>/dev/null
-
-$(LIBRARIES_FOLDER)/%.o: %.cpp
-	$(cxx-command) 2>/dev/null
-
-#
-# Other targets
-#
-clean: clean_compilation_products
-	@$(RM) -rf $(OUT_FOLDER)
-
-clean_compilation_products:
-	@$(RM) -rf $(LIBRARIES_FOLDER)
-	@$(RM) -f *.[aod] *.elf *.eep *.d *.hex
-
-mkdirs:
-	@$(MKDIR) -p $(LIBRARIES_FOLDER)
-
-openLRSng.hex: $(OBJS)
-	@$(CC) -Os -Wl,--gc-sections -mmcu=$(CPU) -o openLRSng.elf $(OBJS) -L$(LIBRARIES_FOLDER) -lm
-	@$(OBJCOPY) -O ihex -j .eeprom --set-section-flags=.eeprom=alloc,load \
-		--no-change-warnings --change-section-lma .eeprom=0 \
-		openLRSng.elf openLRSng.eep
-	@$(OBJCOPY) -O ihex -R .eeprom openLRSng.elf openLRSng.hex
-	@echo "NOTE: Deployment size is text + data."
-	@$(SIZE) openLRSng.elf
-	@$(SED) "/:00000001FF/d" openLRSng.hex > openLRSngBL.hex
-	@$(CAT) bootloaders/$(BOOTLOADER) >> openLRSngBL.hex
-
-$(LIBRARIES_FOLDER)/libcore.a: $(ARDUINO_CORELIB_OBJS)
-	@$(AR) rcs $(LIBRARIES_FOLDER)/libcore.a $(ARDUINO_CORELIB_OBJS)
-
-astyle:
-	$(ASTYLE) $(ASTYLEOPTIONS) openLRSng.ino *.h
-
-433 868 915:
-	$(RM) -rf $(OUT_FOLDER)/$@
-	$(MKDIR) -p $(OUT_FOLDER)/$@
-	$(foreach type, $(BOARD_TYPES_RX), make -s RFMTYPE=$@ COMPILE_TX=0 BOARD_TYPE=$(type) clean_compilation_products all && cp openLRSng.hex $(OUT_FOLDER)/$@/RX-$(type).hex && cp openLRSngBL.hex $(OUT_FOLDER)/$@/RX-$(type)-bl.hex;)
-	$(foreach type, $(BOARD_TYPES_TX), make -s RFMTYPE=$@ COMPILE_TX=1 BOARD_TYPE=$(type) clean_compilation_products all && cp openLRSng.hex $(OUT_FOLDER)/$@/TX-$(type).hex && cp openLRSngBL.hex $(OUT_FOLDER)/$@/TX-$(type)-bl.hex;)
-	make -s RFMTYPE=$@ COMPILE_TX=0 BOARD_TYPE=8 CLOCK=8000000 clean_compilation_products all && cp openLRSng.hex $(OUT_FOLDER)/$@/RX-8-8MHz.hex && cp openLRSngBL.hex $(OUT_FOLDER)/$@/RX-8-8MHz-bl.hex
-	$(LS) -l $(OUT_FOLDER)
-
-allfw: 433 868 915
-	$(LS) -lR $(OUT_FOLDER)
-
+clean:
+	@echo Cleaning...
+	@rm -rf "$(BUILDDIR)"
+	@rm -f "$(TARGET).elf" "$(TARGET).hex"

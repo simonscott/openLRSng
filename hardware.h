@@ -1442,9 +1442,10 @@ void setupRfmInterrupt()
 #define BTN 22
 #define Red_LED 21
 #define Green_LED 20
-#define IRQ_pin 2
-#define nSel_pin 4
+#define IRQ_pin 9
+#define nSel_pin 10
 #define SDI_pin 11
+#define SCK_pin 14
 
 void buzzerInit()
 {
@@ -1484,6 +1485,8 @@ void setupSPI()
 {
   pinMode(IRQ_pin, INPUT);
   pinMode(nSel_pin, OUTPUT);
+  SPI.setSCK(SCK_pin);
+
   nSEL_on;
   SPI.begin();
   SPI.beginTransaction(SPISettings(5000000, MSBFIRST, SPI_MODE0));
@@ -1496,6 +1499,6 @@ void setupRfmInterrupt()
   attachInterrupt(IRQ_pin, RFM22B_Int, FALLING);
 }
 
-#define SWAP_GPIOS
+//#define SWAP_GPIOS
 
 #endif

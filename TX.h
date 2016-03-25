@@ -175,9 +175,9 @@ void ftm0_isr(void)
   {
     // Get current timer value and ACK interrupt
     stopPulse = ftm->cv;
-    ftm->csc = cscEdge;
+    ftm->csc = (cscEdge | FTM_CSC_CHF);
 
-	  if (timerVal > 0xE000 && overflowThisInt)
+	  if (stopPulse > 0xE000 && overflowThisInt)
       m_overflowCount = overflowCount - 1;
     else
       m_overflowCount = overflowCount;
@@ -201,11 +201,10 @@ void setupPPMinput()
   volatile void *reg;
 
   // Determine if we are capturing falling or rising edge
-  if (!(tx_config.flags & INVERTED_PPMIN)) {
+  if (!(tx_config.flags & INVERTED_PPMIN))
     cscEdge = 0b01001000;
   else
     cscEdge = 0b01000100;
-  }
 
   // Setup up the FTM0 registers, if they are not already correctly configured
   if (FTM0_MOD != 0xFFFF || (FTM0_SC & 0x7F) != FTM0_SC_VALUE) {
@@ -219,24 +218,25 @@ void setupPPMinput()
   }
 
   // Determine which FTM channel to use based on PPMIn pin
-  switch (PPMIn) {
+  switch (PPM_IN) {
     case  6: ftmChannel = 4; reg = &FTM0_C4SC; break;
     case  9: ftmChannel = 2; reg = &FTM0_C2SC; break;
     case 10: ftmChannel = 3; reg = &FTM0_C3SC; break;
     case 20: ftmChannel = 5; reg = &FTM0_C5SC; break;
     case 22: ftmChannel = 0; reg = &FTM0_C0SC; break;
     case 23: ftmChannel = 1; reg = &FTM0_C1SC; break;
-  default:
-    return false;
+    default: return;
+  }
 
   // Configure the Status and Control Register (CnSC) for the appropriate input pin
   ftm = (struct ftm_channel_struct *)reg;
-  *portConfigRegister(PPMIn) = PORT_PCR_MUX(4);
+  *portConfigRegister(PPM_IN) = PORT_PCR_MUX(4);
   ftm->csc = cscEdge;
-
+/*
   // Enable the interrupt
   NVIC_SET_PRIORITY(IRQ_FTM0, 32);
   NVIC_ENABLE_IRQ(IRQ_FTM0);
+*/
 
 }
 
@@ -520,7 +520,6 @@ void setup(void)
 #endif
   setupProfile();
   txReadEeprom();
-
   setupPPMinput();
   ppmAge = 255;
 

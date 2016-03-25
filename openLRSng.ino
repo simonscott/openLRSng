@@ -83,8 +83,8 @@
 #include <Arduino.h>
 
 #include "version.h"
-#include "binding.h"
 #include "hardware.h"
+#include "binding.h"
 #include "wd.h"
 #include "common.h"
 

@@ -1,3 +1,7 @@
+#ifdef TEENSY
+#include "wd_teensy.h"
+#else
+
 static inline void watchdogReset();
 #define WATCHDOG_OFF    (0)
 #define WATCHDOG_16MS   (_BV(WDE))
@@ -67,3 +71,4 @@ void watchdogConfig(uint8_t x)
   }
 }
 
+#endif

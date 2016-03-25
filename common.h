@@ -282,6 +282,9 @@ void scannerMode(void)
 
 uint8_t ItStatus1, ItStatus2;
 
+void to_sleep_mode(void);
+void rx_reset(void);
+
 #ifdef TEENSY
 uint8_t spiReadRegister(uint8_t address)
 {
@@ -303,7 +306,7 @@ void spiWriteRegister(uint8_t address, uint8_t data)
 }
 
 // Implemented for binary_com.h
-void spiSendAddress(uint8_t i)
+void spiSendAddress(uint8_t address)
 {
   nSEL_off;
   SPI.transfer(address & 0x7F);
@@ -322,9 +325,6 @@ void spiSendCommand(uint8_t command);
 void spiSendAddress(uint8_t i);
 uint8_t spiReadData(void);
 void spiWriteData(uint8_t i);
-
-void to_sleep_mode(void);
-void rx_reset(void);
 
 // **** SPI bit banging functions
 

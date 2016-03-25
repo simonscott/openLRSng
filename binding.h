@@ -161,28 +161,6 @@ struct rfm22_modem_regs bind_params =
 // prototype
 void fatalBlink(uint8_t blinks);
 
-#ifdef TEENSY
-#include <EEPROM.h>
-
-// Emulate the AVR function for reading EEPROM
-uint8_t eeprom_read_byte(uint8_t* addr)
-{
-  return EEPROM.read((uint16_t)addr);
-}
-
-// Save EEPROM by writing just changed data
-void myEEPROMwrite(int16_t addr, uint8_t data)
-{
-  uint8_t retries = 5;
-  while ((--retries) && (data != eeprom_read_byte((uint8_t *)addr))) {
-    EEPROM.write(addr, data);
-  }
-  if (!retries) {
-    fatalBlink(2);
-  }
-}
-
-#else
 #include <avr/eeprom.h>
 
 // Save EEPROM by writing just changed data
@@ -190,13 +168,14 @@ void myEEPROMwrite(int16_t addr, uint8_t data)
 {
   uint8_t retries = 5;
   while ((--retries) && (data != eeprom_read_byte((uint8_t *)addr))) {
+    Serial.print("Writing addr: ");
+    Serial.println(addr);
     eeprom_write_byte((uint8_t *)addr, data);
   }
   if (!retries) {
     fatalBlink(2);
   }
 }
-#endif
 
 static uint16_t CRC16_value;
 
@@ -226,7 +205,7 @@ extern uint16_t failsafePPM[PPM_CHANNELS];
 #ifdef TEENSY
 
 #define EEPROM_SIZE 128   // EEPROM is 128 bytes on Teensy-LC, 2048 bytes on Teensy 3
-#define MAX_PROFILES  2
+#define MAX_PROFILES  1
 #define ROUNDUP(x) (((x)+15)&0xfff0)
 #if (COMPILE_TX == 1)
 #define EEPROM_DATASIZE ROUNDUP((sizeof(tx_config) + sizeof(bind_data) + 4) * MAX_PROFILES + 3)
@@ -256,8 +235,12 @@ bool accessEEPROM(uint8_t dataType, bool write)
   uint16_t addressNeedle = 0;
   uint16_t addressBase = 0;
   uint16_t CRC = 0;
-
+  
+  // The Teensy does not have enough space to write duplicates of the data.
+  // Therefore, we do not loop through the blocks, as there is only one copy of the data
+#ifndef TEENSY
   do {
+#endif
 start:
 #if (COMPILE_TX == 1)
     if (dataType == 0) {
@@ -302,9 +285,11 @@ start:
       CRC16_add(*((uint8_t*)dataAddress + i));
     }
 
+    // Check CRC on read
     if (!write) {
       CRC = eeprom_read_byte((uint8_t *)addressNeedle) << 8 | eeprom_read_byte((uint8_t *)(addressNeedle + 1));
 
+      #ifndef TEENSY
       if (CRC16_value == CRC) {
         // recover corrupted data
         // write operation is performed after every successful read operation, this will keep all cells valid
@@ -314,13 +299,25 @@ start:
       } else {
         // try next block
       }
+      #else
+      if (CRC16_value == CRC)
+        return true;
+      else
+        return false;
+      #endif
+    // Else write the new CRC on a write
     } else {
       myEEPROMwrite(addressNeedle++, CRC16_value >> 8);
       myEEPROMwrite(addressNeedle, CRC16_value & 0x00FF);
     }
     addressBase += EEPROM_DATASIZE;
+
+#ifndef TEENSY
   } while (addressBase <= (EEPROM_SIZE - EEPROM_DATASIZE));
   return (write); // success on write, failure on read
+#else
+  return true;    // Teensy always return success on a write
+#endif
 }
 
 bool bindReadEeprom()
@@ -357,7 +354,7 @@ void bindInitDefaults(void)
 #if (COMPILE_TX == 1)
 
 #ifdef TEENSY
-#define TX_PROFILE_COUNT  2
+#define TX_PROFILE_COUNT  1
 #else
 #define TX_PROFILE_COUNT  4
 #endif
