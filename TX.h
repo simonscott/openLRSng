@@ -201,16 +201,16 @@ void setupPPMinput()
   volatile void *reg;
 
   // Determine if we are capturing falling or rising edge
-  if (!(tx_config.flags & INVERTED_PPMIN))
-    cscEdge = 0b01001000;
+  if (INVERTED_PPMIN)
+    cscEdge = 0b01001000; // enable chan interrupts, (MSBA) = Input Capture, (ELSBA) = falling edge
   else
-    cscEdge = 0b01000100;
+    cscEdge = 0b01000100; // enable chan interrupts, (MSBA) = Input Capture, (ELSBA) = rising edge
 
   // Setup up the FTM0 registers, if they are not already correctly configured
   if (FTM0_MOD != 0xFFFF || (FTM0_SC & 0x7F) != FTM0_SC_VALUE) {
-    FTM0_SC = 0;
-    FTM0_CNT = 0;
-    FTM0_MOD = 0xFFFF;
+    FTM0_SC = 0;          // disable interrupts
+    FTM0_CNT = 0;         // reset TPM counter
+    FTM0_MOD = 0xFFFF;    // set Modulo value to 0xFFFF (no modulo)
     FTM0_SC = FTM0_SC_VALUE;
     #if defined(KINETISK)
 		FTM0_MODE = 0;
@@ -229,15 +229,16 @@ void setupPPMinput()
   }
 
   // Configure the Status and Control Register (CnSC) for the appropriate input pin
+  // Also set the MUX for that pin to the FTM module
   ftm = (struct ftm_channel_struct *)reg;
   *portConfigRegister(PPM_IN) = PORT_PCR_MUX(4);
+  ftm->csc = 0;
+  delay(1);
   ftm->csc = cscEdge;
-/*
+
   // Enable the interrupt
   NVIC_SET_PRIORITY(IRQ_FTM0, 32);
   NVIC_ENABLE_IRQ(IRQ_FTM0);
-*/
-
 }
 
 #else // sample PPM using pinchange interrupt
