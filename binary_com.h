@@ -55,7 +55,7 @@ uint8_t PSP_crc;
 
 void PSP_serialize_uint8(uint8_t data)
 {
-  Serial.write(data);
+  Serial.write((char)(data));
   PSP_crc ^= data;
 }
 
@@ -117,9 +117,8 @@ void PSP_process_data(uint8_t code, uint16_t payload_length_received, uint8_t da
   case PSP_REQ_BIND_DATA:
     PSP_protocol_head(PSP_REQ_BIND_DATA, sizeof(bind_data));
     {
-      for (uint16_t i = 0; i < sizeof(bind_data); i++) {
+      for (uint16_t i = 0; i < sizeof(bind_data); i++)
         PSP_serialize_uint8(AS_U8ARRAY(&bind_data)[i]);
-      }
     }
     break;
   case PSP_REQ_RX_CONFIG:
@@ -214,10 +213,8 @@ void PSP_process_data(uint8_t code, uint16_t payload_length_received, uint8_t da
       } else {
         tx_config.flags &=~ WATCHDOG_USED;
       }
-
-      for (uint16_t i = 0; i < sizeof(tx_config); i++) {
+      for (uint16_t i = 0; i < sizeof(tx_config); i++)
         PSP_serialize_uint8(AS_U8ARRAY(&tx_config)[i]);
-      }
     }
   }
   break;

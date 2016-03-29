@@ -104,7 +104,7 @@ static uint8_t default_hop_list[] = {DEFAULT_HOPLIST};
 uint8_t activeProfile = 0;
 uint8_t defaultProfile = 0;
 
-struct tx_config {
+struct __attribute__ ((__packed__)) tx_config {
   uint8_t  rfm_type;
   uint32_t max_frequency;
   uint32_t flags;
@@ -115,7 +115,7 @@ struct tx_config {
 #define TX_CONFIG_GETMINCH() (tx_config.flags >> 28)
 #define TX_CONFIG_SETMINCH(x) (tx_config.flags = (tx_config.flags & 0x0fffffff) | (((uint32_t)(x) & 0x0f) << 28))
 
-struct RX_config {
+struct __attribute__ ((__packed__)) RX_config {
   uint8_t  rx_type; // RX type fillled in by RX, do not change
   uint8_t  pinMapping[13];
   uint8_t  flags;
@@ -130,7 +130,7 @@ struct RX_config {
 } rx_config;
 
 
-struct bind_data {
+struct __attribute__ ((__packed__)) bind_data {
   uint8_t version;
   uint32_t serial_baudrate;
   uint32_t rf_frequency;
@@ -168,8 +168,6 @@ void myEEPROMwrite(int16_t addr, uint8_t data)
 {
   uint8_t retries = 5;
   while ((--retries) && (data != eeprom_read_byte((uint8_t *)addr))) {
-    Serial.print("Writing addr: ");
-    Serial.println(addr);
     eeprom_write_byte((uint8_t *)addr, data);
   }
   if (!retries) {
