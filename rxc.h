@@ -29,6 +29,7 @@ uint8_t rxcConnect()
   spiSendAddress(0x7f);   // Send the package read command
   tx_buf[0] = spiReadData();
   if (tx_buf[0] != 'T') {
+    nSEL_on;
     return 3;
   }
 
@@ -38,12 +39,14 @@ uint8_t rxcConnect()
   rxcNumberOfOutputs = spiReadData();
   rxcSpecialPinCount = spiReadData();
   if (rxcSpecialPinCount > RXC_MAX_SPECIAL_PINS) {
+    nSEL_on;
     return 3;
   }
 
   for (uint8_t i = 0; i < sizeof(struct rxSpecialPinMap) * rxcSpecialPinCount; i++) {
     *(((uint8_t*)&rxcSpecialPins) + i) = spiReadData();
   }
+  nSEL_on;
 
   tx_buf[0] = 'p'; // ask for config dump
   tx_packet(tx_buf, 1);
@@ -57,12 +60,14 @@ uint8_t rxcConnect()
   spiSendAddress(0x7f);   // Send the package read command
   tx_buf[0] = spiReadData();
   if (tx_buf[0] != 'P') {
+    nSEL_on;
     return 3;
   }
 
   for (uint8_t i = 0; i < sizeof(rx_config); i++) {
     *(((uint8_t*)&rx_config) + i) = spiReadData();
   }
+  nSEL_on;
   return 1;
 }
 

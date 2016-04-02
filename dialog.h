@@ -325,8 +325,7 @@ void handleRXmenu(char c)
       RF_Mode = Receive;
       delay(200);
       if (RF_Mode == Received) {
-        spiSendAddress(0x7f);   // Send the package read command
-        tx_buf[0] = spiReadData();
+        tx_buf[0] = spiReadRegister(0x7f);
         if (tx_buf[0] == 'U') {
           Serial.println(F("*****************************"));
           Serial.println(F("RX Acked - update successful!"));
@@ -350,6 +349,7 @@ void handleRXmenu(char c)
         for (uint8_t i = 0; i < sizeof(rx_config); i++) {
           tx_buf[i + 1] = spiReadData();
         }
+        nSEL_on;
         memcpy(&rx_config, tx_buf + 1, sizeof(rx_config));
         if (tx_buf[0]=='I') {
           Serial.println(F("*****************************"));

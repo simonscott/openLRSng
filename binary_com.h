@@ -190,6 +190,7 @@ void PSP_process_data(uint8_t code, uint16_t payload_length_received, uint8_t da
         PSP_protocol_head(PSP_REQ_RX_FAILSAFE, 1);
         PSP_serialize_uint8(0x01); // failsafe not set
       }
+      nSEL_on;
     } else {
       PSP_protocol_head(PSP_REQ_RX_FAILSAFE, 1);
       PSP_serialize_uint8(0x00); // fail
@@ -281,6 +282,7 @@ void PSP_process_data(uint8_t code, uint16_t payload_length_received, uint8_t da
       if (RF_Mode == Received) {
         spiSendAddress(0x7f); // Send the package read command
         tx_buf[0] = spiReadData();
+        nSEL_on;
         if (tx_buf[0]=='U') {
           PSP_serialize_uint8(0x01); // success
         } else {
@@ -301,31 +303,33 @@ void PSP_process_data(uint8_t code, uint16_t payload_length_received, uint8_t da
     break;
   case PSP_SET_RX_RESTORE_DEFAULT:
     PSP_protocol_head(PSP_SET_RX_RESTORE_DEFAULT, 1);
+    {
+      uint8_t tx_buf[1 + sizeof(rx_config)];
+      tx_buf[0] = 'i';
+      tx_packet(tx_buf,1);
+      rx_reset();
+      RF_Mode = Receive;
+      delay(800);
 
-    uint8_t tx_buf[1 + sizeof(rx_config)];
-    tx_buf[0] = 'i';
-    tx_packet(tx_buf,1);
-    rx_reset();
-    RF_Mode = Receive;
-    delay(800);
+      if (RF_Mode == Received) {
+        spiSendAddress(0x7f);   // Send the package read command
+        tx_buf[0] = spiReadData();
 
-    if (RF_Mode == Received) {
-      spiSendAddress(0x7f);   // Send the package read command
-      tx_buf[0] = spiReadData();
+        for (uint8_t i = 0; i < sizeof(rx_config); i++) {
+          tx_buf[i + 1] = spiReadData();
+        }
+        nSEL_on;
 
-      for (uint8_t i = 0; i < sizeof(rx_config); i++) {
-        tx_buf[i + 1] = spiReadData();
-      }
+        memcpy(&rx_config, tx_buf + 1, sizeof(rx_config));
 
-      memcpy(&rx_config, tx_buf + 1, sizeof(rx_config));
-
-      if (tx_buf[0] == 'I') {
-        PSP_serialize_uint8(0x01); // success
+        if (tx_buf[0] == 'I') {
+          PSP_serialize_uint8(0x01); // success
+        } else {
+          PSP_serialize_uint8(0x00); // fail
+        }
       } else {
         PSP_serialize_uint8(0x00); // fail
       }
-    } else {
-      PSP_serialize_uint8(0x00); // fail
     }
     break;
   case PSP_SET_ACTIVE_PROFILE:
@@ -358,6 +362,7 @@ void PSP_process_data(uint8_t code, uint16_t payload_length_received, uint8_t da
         } else {
           PSP_serialize_uint8(0x00);
         }
+        nSEL_on;
       } else {
         PSP_serialize_uint8(0x00);
       }

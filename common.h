@@ -597,9 +597,15 @@ void tx_packet_async(uint8_t* pkt, uint8_t size)
 {
   spiWriteRegister(0x3e, size);   // total tx size
 
+  nSEL_off;
+  delayMicroseconds(1);
+  SPI.transfer(0x7f | 0x80);
+
   for (uint8_t i = 0; i < size; i++) {
-    spiWriteRegister(0x7f, pkt[i]);
+    SPI.transfer(pkt[i]);
   }
+  delayMicroseconds(1);
+  nSEL_on;
 
   spiWriteRegister(0x05, RF22B_PACKET_SENT_INTERRUPT);
   ItStatus1 = spiReadRegister(0x03);      //read the Interrupt Status1 register
