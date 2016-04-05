@@ -136,6 +136,10 @@ void setupPPMinput()
 #define CLOCKS_PER_MICROSECOND ((double)F_PLL / 2000000.0)
 #endif
 
+// Width of each PPM pulse in microseconds
+// This is true for Spektrum Dx6i, may change for others
+#define PPM_PULSE_WD_US 400
+
 // FTM_SC_TOIE: enable FTM overflow interrupts
 // FTM_SC_CLKS(1): sets counter to increment on every clock cycle
 // FTM_SC_PS(0): no prescaler
@@ -187,6 +191,15 @@ void ftm0_isr(void)
 
     // Calculate pulse duration in clocks. Wraparound is ok, as numbers are unsigned.
     durationClks = stopPulse - startPulse;
+
+    // It is possible for there to be bounce on the rising edge after the 400us low-pulse.
+    // It is also possible for a falling edge to ring. We should ignore both these edge
+    // cases and do not process them.
+    if(durationClks < (CLOCKS_PER_MICROSECOND * 10) ||
+        (durationClks > (CLOCKS_PER_MICROSECOND * (PPM_PULSE_WD_US - 20)) &&
+         durationClks < (CLOCKS_PER_MICROSECOND * (PPM_PULSE_WD_US + 20)) ) )
+      return;
+
     startPulse = stopPulse;
 
     // Process the interval between pulses
@@ -746,9 +759,13 @@ uint16_t getChannel(uint8_t ch)
   uint16_t v=512;
   ch = tx_config.chmap[ch];
   if (ch < 16) {
+#ifdef TEENSY
+    v = PPM[ch];  // Teensy can write all 16-bits in single clock cycle, so no need to disable interrupts
+#else
     cli();  // disable interrupts when copying servo positions, to avoid race on 2 byte variable written by ISR
     v = PPM[ch];
     sei();
+#endif
   } else if ((ch > 0xf1) && (ch < 0xfd)) {
     v = 12 + (ch - 0xf2) * 100;
   } else {

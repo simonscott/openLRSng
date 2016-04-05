@@ -1499,6 +1499,6 @@ void setupRfmInterrupt()
   attachInterrupt(IRQ_pin, RFM22B_Int, FALLING);
 }
 
-//#define SWAP_GPIOS
+#define SWAP_GPIOS
 
 #endif
