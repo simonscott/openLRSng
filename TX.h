@@ -1049,6 +1049,9 @@ void loop(void)
         sampleRSSI = 1;
       }
     }
+
+    //Green LED will be OFF
+    Green_LED_OFF;
   }
 
   if ((bind_data.flags & TELEMETRY_FRSKY) && lastTelemetry) {
@@ -1060,8 +1063,6 @@ void loop(void)
     frskyUpdate(RX_ain0, RX_ain1, compRX, compTX, activeProfile);
     //frskyUpdate(RX_ain0,RX_ain1,lastTelemetry?RSSI_rx:0,lastTelemetry?RSSI_tx:0);
   }
-  //Green LED will be OFF
-  Green_LED_OFF;
 
   checkFS();
 }
